@@ -240,6 +240,36 @@ container = 8080
 }
 
 #[test]
+fn builds_published_ports_with_bracketed_ipv6_bind_addresses() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+host = 18080
+bind = "::1"
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::new(),
+        readonly_files: vec![],
+    };
+
+    let args = build_run_args(
+        &config,
+        PathBuf::from("/repo"),
+        &inputs,
+        &["sh".to_string(), "-lc".to_string(), "echo hi".to_string()],
+    );
+
+    assert!(args.iter().any(|arg| arg == "[::1]:18080:8080"));
+    assert!(!args.iter().any(|arg| arg == "::1:18080:8080"));
+}
+
+#[test]
 fn omits_configured_ports_from_tool_check_arguments() {
     let config: CampfireConfig = toml::from_str(
         r#"

@@ -21,7 +21,7 @@ Selected environment variables and fixed values are passed explicitly.
 Configured ports are published for developer-facing runs. The default bind
 address is `127.0.0.1`, so services are reachable from the host machine without
 being exposed to the local network unless the project opts into a wider bind
-address.
+address. Bind addresses may be IPv4 or IPv6.
 
 Campfire should fail early before running Podman when required host inputs are
 missing.

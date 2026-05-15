@@ -91,7 +91,9 @@ Each `[[ports]]` entry publishes one TCP port from the container to the host for
 - `container` is required and must be between `1` and `65535`.
 - `host` is optional, must be between `1` and `65535`, and defaults to the same
   value as `container`.
-- `bind` is optional, must be an IP address, and defaults to `127.0.0.1`.
+- `bind` is optional, must be an IPv4 or IPv6 address, and defaults to
+  `127.0.0.1`. IPv6 values are written without brackets in `Campfire.toml`,
+  such as `bind = "::1"`.
 
 The localhost default keeps dev servers private to the user's machine. Projects
 that intentionally need LAN access can set `bind = "0.0.0.0"`.

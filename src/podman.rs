@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 #[cfg(windows)]
 use std::path::{Component, Prefix};
 use std::path::{Path, PathBuf};
@@ -133,11 +134,10 @@ fn base_run_args(
     if mode.publishes_ports() {
         for port in &config.ports {
             args.push("--publish".to_string());
-            args.push(format!(
-                "{}:{}:{}",
+            args.push(publish_spec(
                 port.bind_address(),
                 port.host_port(),
-                port.container
+                port.container,
             ));
         }
     }
@@ -166,6 +166,20 @@ fn base_run_args(
     }
 
     args
+}
+
+fn publish_spec(bind_address: &str, host_port: u32, container_port: u32) -> String {
+    format!(
+        "{}:{host_port}:{container_port}",
+        publish_bind_address(bind_address)
+    )
+}
+
+fn publish_bind_address(bind_address: &str) -> String {
+    match bind_address.parse::<IpAddr>() {
+        Ok(IpAddr::V6(_)) => format!("[{bind_address}]"),
+        _ => bind_address.to_string(),
+    }
 }
 
 fn path_to_string(path: &Path) -> String {

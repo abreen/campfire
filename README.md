@@ -144,7 +144,7 @@ container = 8080
 - `[[ports]]`
   - `container` is the required TCP port inside the container.
   - `host` defaults to the same value as `container`.
-  - `bind` defaults to `127.0.0.1` for local-only access.
+  - `bind` defaults to `127.0.0.1` for local-only access and may be IPv4 or IPv6.
   - Ports are published for `cf enter` and `cf run`, not for `cf check`.
 
 Read-only files are mounted at the resolved host path inside Linux and macOS

@@ -447,6 +447,40 @@ host = 18080
 }
 
 #[test]
+fn run_brackets_ipv6_bind_addresses_for_published_ports() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+host = 18080
+bind = "::1"
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "ran");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .args(["run", "--", "sh", "-lc", "echo hi"])
+        .assert()
+        .success();
+
+    let calls = fs::read_to_string(log).expect("podman log");
+    assert!(calls.contains("--publish [::1]:18080:8080"));
+    assert!(!calls.contains("--publish ::1:18080:8080"));
+}
+
+#[test]
 fn run_executes_configured_command_by_name() {
     let project = tempfile::tempdir().expect("project tempdir");
     fs::write(

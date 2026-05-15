@@ -194,6 +194,22 @@ toolbox run --container fedora-toolbox-43 cargo clippy --all-targets -- -D warni
 toolbox run --container fedora-toolbox-43 cargo test --all-targets
 ```
 
+On native Windows, install Rust with rustup, install Visual Studio Build Tools
+with the C++ workload, and install Podman with winget. Start the Podman machine
+before real integration tests:
+
+```cmd
+podman machine start
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+set CAMPFIRE_RUN_PODMAN_TESTS=1&& cargo test --test podman_integration_tests -- --nocapture
+```
+
+Fedora WSL can build and test the Rust code, but WSL-native Podman may require
+extra networking setup before the real Podman integration suite passes. Native
+Windows Podman is the supported Windows runtime path for now.
+
 Run real Podman integration tests only when host Podman is available:
 
 ```sh
@@ -212,3 +228,5 @@ You can override the integration-test image with `CAMPFIRE_PODMAN_TEST_IMAGE`.
   process using it.
 - SELinux bind mounts on Fedora Silverblue are expected to work because Campfire passes
   `--security-opt label=disable` to Podman.
+- Native Windows real Podman tests require a running Podman machine. Run
+  `podman machine start` first.

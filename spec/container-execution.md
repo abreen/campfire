@@ -12,7 +12,9 @@ read-only file mounts.
 The project root is mounted read-write at the configured workspace path. This is
 the main editing surface.
 
-Additional files are mounted read-only at their resolved host paths.
+Additional files are mounted read-only. On Linux and macOS, the container
+destination matches the resolved host path. On native Windows, the container
+destination uses the WSL-style path for the same drive location.
 
 Selected environment variables and fixed values are passed explicitly.
 
@@ -93,3 +95,8 @@ the Podman security option needed for this workflow.
 
 On macOS, Podman normally runs through a Podman machine. Campfire expects the
 `podman` command to hide that detail.
+
+On native Windows, Podman normally runs through a Podman-managed WSL machine.
+Campfire still invokes the native `podman` command. Read-only file destinations
+must be Linux container paths, so Windows drive paths are translated to
+`/mnt/<drive>/...` destinations.

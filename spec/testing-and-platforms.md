@@ -38,7 +38,7 @@ They should cover behavior that fake Podman cannot prove:
 - workspace writes reach the host,
 - host env and read-only files are visible inside the container,
 - `cf run` preserves stdin through the real container process,
-- project-root-relative files work when `cf` is run from a subdirectory.
+- project-root-relative files work when `cf` is run from a subdirectory,
 - a server inside `cf run` is reachable from the host through a configured
   published localhost port.
 
@@ -71,12 +71,19 @@ Native Windows development should support Rust installed through rustup, MSVC
 Build Tools, and Podman installed through winget. Podman normally runs through a
 Podman-managed WSL machine.
 
+The Podman machine must be running before real Podman integration tests:
+
+```cmd
+podman machine start
+```
+
 Native Windows read-only file mounts should use WSL-style container destinations
 such as `/mnt/c/...` because Linux containers cannot mount files at `C:\...`
 destinations.
 
 Fedora WSL can build and run the Rust test suite. WSL-native Podman may need
-extra networking setup before Campfire's real Podman integration tests can pass.
+extra networking setup before Campfire's real Podman integration tests can pass;
+native Windows Podman is the expected Windows runtime path until that is solved.
 
 ## Cross-Platform Verification
 

@@ -299,6 +299,7 @@ required_readonly = ["config/settings.toml"]
         .success();
 
     let calls = fs::read_to_string(log).expect("podman log");
+    let settings = settings.canonicalize().expect("canonical settings path");
     assert!(calls.contains(&format!("{}:{}:ro", settings.display(), settings.display())));
 }
 

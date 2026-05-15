@@ -1,0 +1,28 @@
+[package]
+name = "campfire"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "A repo-defined toolbox shell CLI."
+readme = "README.md"
+publish = false
+
+[lib]
+name = "campfire"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cf"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
+toml = "0.9"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+tempfile = "3.15"

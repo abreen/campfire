@@ -1,0 +1,16 @@
+# Rust build output
+/target/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local editor/OS noise
+.DS_Store
+.idea/
+.vscode/
+
+# Logs and coverage output
+*.log
+*.profraw

@@ -1,6 +1,9 @@
+use std::env;
 use std::ffi::OsString;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStringExt;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
@@ -152,6 +155,7 @@ required = ["AWS_PROFILE"]
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn check_ignores_unrelated_non_utf8_env_vars() {
     let project = tempfile::tempdir().expect("project tempdir");
@@ -340,11 +344,7 @@ required_readonly = ["~/.aws/credentials"]
         .success();
 
     let calls = fs::read_to_string(log).expect("podman log");
-    assert!(calls.contains(&format!(
-        "{}:{}:ro",
-        credentials.display(),
-        credentials.display()
-    )));
+    assert_readonly_mount_logged(&calls, &credentials);
 }
 
 #[test]
@@ -381,8 +381,7 @@ required_readonly = ["config/settings.toml"]
         .success();
 
     let calls = fs::read_to_string(log).expect("podman log");
-    let settings = settings.canonicalize().expect("canonical settings path");
-    assert!(calls.contains(&format!("{}:{}:ro", settings.display(), settings.display())));
+    assert_readonly_mount_logged(&calls, &settings);
 }
 
 #[test]
@@ -605,6 +604,11 @@ fn run_propagates_podman_exit_code() {
 
 fn write_fake_podman(dir: &Path, log: &Path, tool_output: &str) {
     fs::create_dir_all(dir).expect("fake bin dir");
+    write_fake_podman_platform(dir, log, tool_output);
+}
+
+#[cfg(unix)]
+fn write_fake_podman_platform(dir: &Path, log: &Path, tool_output: &str) {
     let script = format!(
         r#"#!/bin/sh
 printf '%s\n' "$*" >> "${{PODMAN_LOG:-{log}}}"
@@ -625,7 +629,125 @@ exit "${{PODMAN_EXIT_CODE:-0}}"
     fs::set_permissions(&path, permissions).expect("chmod fake podman");
 }
 
-fn fake_path(fake_bin: &Path) -> String {
-    let old_path = std::env::var("PATH").unwrap_or_default();
-    format!("{}:{old_path}", fake_bin.display())
+#[cfg(windows)]
+fn write_fake_podman_platform(dir: &Path, log: &Path, tool_output: &str) {
+    let source = dir.join("podman-fake.rs");
+    let exe = dir.join("podman.exe");
+    let log = format!("{:?}", log.display().to_string());
+    let tool_output = format!("{tool_output:?}");
+    let script = format!(
+        r#"
+use std::env;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
+use std::process;
+
+fn main() {{
+    let log = env::var_os("PODMAN_LOG")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from({log}));
+    let args = env::args().skip(1).collect::<Vec<_>>();
+
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+        .expect("open podman log");
+    writeln!(file, "{{}}", args.join(" ")).expect("write podman log");
+
+    if args.first().is_some_and(|arg| arg == "--version") {{
+        println!("podman version 5.0.0");
+        return;
+    }}
+
+    println!({tool_output});
+    let exit_code = env::var("PODMAN_EXIT_CODE")
+        .ok()
+        .and_then(|value| value.parse::<i32>().ok())
+        .unwrap_or(0);
+    process::exit(exit_code);
+}}
+"#,
+        log = log,
+        tool_output = tool_output
+    );
+    fs::write(&source, script).expect("write fake podman source");
+    let status = std::process::Command::new("rustc")
+        .arg(&source)
+        .arg("-o")
+        .arg(&exe)
+        .status()
+        .expect("compile fake podman");
+    assert!(status.success(), "fake podman compile failed: {status}");
+}
+
+fn fake_path(fake_bin: &Path) -> OsString {
+    let mut paths = vec![fake_bin.to_path_buf()];
+    if let Some(path) = env::var_os("PATH") {
+        paths.extend(env::split_paths(&path));
+    }
+
+    env::join_paths(paths).expect("join PATH")
+}
+
+fn assert_readonly_mount_logged(calls: &str, path: &Path) {
+    let calls = calls.replace('\\', "/");
+    let mut candidates = vec![path.to_path_buf()];
+    if let Ok(canonical) = path.canonicalize()
+        && !candidates.contains(&canonical)
+    {
+        candidates.push(canonical);
+    }
+
+    let expected = candidates
+        .iter()
+        .map(|path| {
+            let host_path = path.display().to_string().replace('\\', "/");
+            let container_path = readonly_container_path_for_assertion(path);
+            format!("{host_path}:{container_path}:ro")
+        })
+        .collect::<Vec<_>>();
+
+    assert!(
+        expected.iter().any(|mount| calls.contains(mount)),
+        "expected one of these read-only mounts:\n{}\nin podman calls:\n{calls}",
+        expected.join("\n")
+    );
+}
+
+fn readonly_container_path_for_assertion(path: &Path) -> String {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+
+        let mut parts = Vec::new();
+        let mut drive = None;
+
+        for component in path.components() {
+            match component {
+                Component::Prefix(prefix) => {
+                    drive = match prefix.kind() {
+                        Prefix::Disk(drive) | Prefix::VerbatimDisk(drive) => {
+                            Some((drive as char).to_ascii_lowercase())
+                        }
+                        _ => None,
+                    };
+                }
+                Component::RootDir | Component::CurDir => {}
+                Component::ParentDir => parts.push("..".to_string()),
+                Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
+            }
+        }
+
+        match drive {
+            Some(drive) => format!("/mnt/{drive}/{}", parts.join("/")),
+            None => path.display().to_string().replace('\\', "/"),
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        path.display().to_string().replace('\\', "/")
+    }
 }

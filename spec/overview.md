@@ -63,7 +63,7 @@ Campfire does not keep a long-lived cache of host inputs.
 
 ## Compatibility
 
-Campfire should behave consistently on Linux and macOS for supported workflows.
-Path spelling can differ across platforms, especially on macOS where temporary
-directories can resolve through `/private/var`. Behavior should follow canonical
-host paths when the operating system presents them.
+Campfire should behave consistently on Linux, macOS, and Windows for supported
+workflows. Path spelling can differ across platforms, especially on macOS where
+temporary directories can resolve through `/private/var` and on native Windows
+where read-only file mounts use WSL-style container paths.

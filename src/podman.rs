@@ -1,3 +1,5 @@
+#[cfg(windows)]
+use std::path::{Component, Prefix};
 use std::path::{Path, PathBuf};
 
 use crate::commands::build_snippet_shell_command;
@@ -152,9 +154,10 @@ fn base_run_args(
     ]);
 
     for file in &inputs.readonly_files {
-        let file = path_to_string(file);
+        let host_file = path_to_string(file);
+        let container_file = readonly_container_path(file);
         args.push("--volume".to_string());
-        args.push(format!("{file}:{file}:ro"));
+        args.push(format!("{host_file}:{container_file}:ro"));
     }
 
     for (name, value) in &inputs.env {
@@ -167,6 +170,45 @@ fn base_run_args(
 
 fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
+}
+
+fn readonly_container_path(path: &Path) -> String {
+    #[cfg(windows)]
+    {
+        windows_container_path(path)
+    }
+
+    #[cfg(not(windows))]
+    {
+        path_to_string(path)
+    }
+}
+
+#[cfg(windows)]
+fn windows_container_path(path: &Path) -> String {
+    let mut parts = Vec::new();
+    let mut drive = None;
+
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => {
+                drive = match prefix.kind() {
+                    Prefix::Disk(drive) | Prefix::VerbatimDisk(drive) => {
+                        Some((drive as char).to_ascii_lowercase())
+                    }
+                    _ => None,
+                };
+            }
+            Component::RootDir | Component::CurDir => {}
+            Component::ParentDir => parts.push("..".to_string()),
+            Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
+        }
+    }
+
+    match drive {
+        Some(drive) => format!("/mnt/{drive}/{}", parts.join("/")),
+        None => path_to_string(path).replace('\\', "/"),
+    }
 }
 
 fn is_bash_shell(shell: &str) -> bool {

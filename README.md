@@ -147,7 +147,10 @@ container = 8080
   - `bind` defaults to `127.0.0.1` for local-only access.
   - Ports are published for `cf enter` and `cf run`, not for `cf check`.
 
-Read-only files are mounted at the same absolute path inside the container.
+Read-only files are mounted at the resolved host path inside Linux and macOS
+containers. On native Windows, drive paths are mounted at the matching WSL-style
+container path, such as `/mnt/c/Users/alex/.aws/config`.
+
 Files written under the workspace path are available outside the campfire because
 the project root is mounted read-write.
 

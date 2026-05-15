@@ -52,6 +52,16 @@ mounts.
 The project root is the directory containing `Campfire.toml`. This matters when
 users run `cf` from a subdirectory.
 
+## Container Paths
+
+On Linux and macOS, read-only files are mounted inside the container at the same
+absolute path used on the host after resolution.
+
+On native Windows, read-only files are mounted at WSL-style paths because Linux
+containers cannot use `C:\...` paths as container destinations. For example,
+`C:\Users\alex\.aws\config` appears inside the container at
+`/mnt/c/Users/alex/.aws/config`.
+
 ## Privacy and Safety
 
 Campfire should keep host exposure explicit. Projects should ask only for the

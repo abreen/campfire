@@ -53,8 +53,9 @@ Paths beginning with `~/` are resolved from the host home directory. Absolute
 paths are used as absolute host paths. Relative paths are resolved from the
 project root, not from the shell's current subdirectory.
 
-Read-only files appear inside the container at the same absolute path used on
-the host after resolution.
+Read-only files appear inside the container at the resolved host path on Linux
+and macOS. On native Windows, drive paths appear at the matching WSL-style path:
+`C:\Users\alex\.aws\config` becomes `/mnt/c/Users/alex/.aws/config`.
 
 ## Tools Section
 

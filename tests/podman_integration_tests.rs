@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::path::Path;
 use std::process::{Child, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -21,6 +22,7 @@ fn real_podman_check_runs_with_workspace_env_and_readonly_file() {
     fs::write(&secret, "secret-value").expect("secret file");
 
     let image = podman_test_image();
+    let container_secret = container_file_path(&secret);
     let secret = secret.display();
     fs::write(
         project.path().join("Campfire.toml"),
@@ -32,10 +34,10 @@ image = "{image}"
 [env]
 pass = ["CAMPFIRE_ITEST_ENV"]
 required = ["CAMPFIRE_ITEST_ENV"]
-set = {{ CAMPFIRE_ITEST_FILE = "{secret}" }}
+set = {{ CAMPFIRE_ITEST_FILE = '{container_secret}' }}
 
 [files]
-required_readonly = ["{secret}"]
+required_readonly = ['{secret}']
 
 [tools.integration]
 check = "test \"$CAMPFIRE_ITEST_ENV\" = \"outer-value\" && test \"$(cat /workspace/workspace.txt)\" = \"workspace-value\" && test \"$(cat \"$CAMPFIRE_ITEST_FILE\")\" = \"secret-value\" && echo campfire-podman-ok"
@@ -138,6 +140,7 @@ fn real_podman_check_reads_project_relative_required_file_from_subdir() {
 
     let image = podman_test_image();
     let secret = secret.canonicalize().expect("canonical secret path");
+    let container_secret = container_file_path(&secret);
     fs::write(
         project.path().join("Campfire.toml"),
         format!(
@@ -146,7 +149,7 @@ fn real_podman_check_reads_project_relative_required_file_from_subdir() {
 image = "{image}"
 
 [env]
-set = {{ CAMPFIRE_RELATIVE_SECRET = "{}" }}
+set = {{ CAMPFIRE_RELATIVE_SECRET = '{container_secret}' }}
 
 [files]
 required_readonly = ["config/secret.txt"]
@@ -155,7 +158,6 @@ required_readonly = ["config/secret.txt"]
 check = "test \"$(cat \"$CAMPFIRE_RELATIVE_SECRET\")\" = \"campfire-relative-secret\" && echo relative-secret-ok"
 contains = "relative-secret-ok"
 "#,
-            secret.display()
         ),
     )
     .expect("write config");
@@ -277,6 +279,42 @@ fn skip_unless_enabled() -> bool {
 fn podman_test_image() -> String {
     std::env::var("CAMPFIRE_PODMAN_TEST_IMAGE")
         .unwrap_or_else(|_| "docker.io/library/alpine:3.20".to_string())
+}
+
+fn container_file_path(path: &Path) -> String {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+
+        let mut parts = Vec::new();
+        let mut drive = None;
+
+        for component in path.components() {
+            match component {
+                Component::Prefix(prefix) => {
+                    drive = match prefix.kind() {
+                        Prefix::Disk(drive) | Prefix::VerbatimDisk(drive) => {
+                            Some((drive as char).to_ascii_lowercase())
+                        }
+                        _ => None,
+                    };
+                }
+                Component::RootDir | Component::CurDir => {}
+                Component::ParentDir => parts.push("..".to_string()),
+                Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
+            }
+        }
+
+        match drive {
+            Some(drive) => format!("/mnt/{drive}/{}", parts.join("/")),
+            None => path.display().to_string().replace('\\', "/"),
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        path.display().to_string()
+    }
 }
 
 fn free_local_port() -> u16 {

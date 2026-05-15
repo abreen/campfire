@@ -65,7 +65,21 @@ macOS can present temporary paths through canonical `/private/var` paths. Tests
 and specs should describe behavior in terms of resolved host paths rather than
 assuming Linux path spelling.
 
+## Windows Expectations
+
+Native Windows development should support Rust installed through rustup, MSVC
+Build Tools, and Podman installed through winget. Podman normally runs through a
+Podman-managed WSL machine.
+
+Native Windows read-only file mounts should use WSL-style container destinations
+such as `/mnt/c/...` because Linux containers cannot mount files at `C:\...`
+destinations.
+
+Fedora WSL can build and run the Rust test suite. WSL-native Podman may need
+extra networking setup before Campfire's real Podman integration tests can pass.
+
 ## Cross-Platform Verification
 
 Before treating behavior as stable, run the normal Rust checks and the opt-in
-Podman integration tests on Linux and macOS when both machines are available.
+Podman integration tests on Linux, macOS, and native Windows when those machines
+are available.

@@ -254,7 +254,7 @@ image = "fedora"
         .success();
 
     let calls = fs::read_to_string(log).expect("podman log");
-    assert!(calls.contains("run --rm --security-opt label=disable --workdir /workspace"));
+    assert!(calls.contains("run --rm -i --security-opt label=disable --workdir /workspace"));
     assert!(calls.contains(&format!("{}:/workspace:rw", project.path().display())));
     assert!(calls.contains("fedora sh -lc echo hi"));
 }

@@ -3,12 +3,18 @@ use std::path::{Path, PathBuf};
 use crate::config::{CampfireConfig, ToolCheck};
 use crate::host::ResolvedHostInputs;
 
+enum RunMode {
+    InteractiveTty,
+    Stdin,
+    NonInteractive,
+}
+
 pub fn build_enter_args(
     config: &CampfireConfig,
     project_root: PathBuf,
     inputs: &ResolvedHostInputs,
 ) -> Vec<String> {
-    let mut args = base_run_args(config, &project_root, inputs, true);
+    let mut args = base_run_args(config, &project_root, inputs, RunMode::InteractiveTty);
     args.push(config.campfire.image.clone());
     args.push(config.campfire.shell.clone());
     args
@@ -20,7 +26,7 @@ pub fn build_tool_check_args(
     inputs: &ResolvedHostInputs,
     tool: &ToolCheck,
 ) -> Vec<String> {
-    let mut args = base_run_args(config, &project_root, inputs, false);
+    let mut args = base_run_args(config, &project_root, inputs, RunMode::NonInteractive);
     args.push(config.campfire.image.clone());
     args.push("/bin/sh".to_string());
     args.push("-lc".to_string());
@@ -34,7 +40,7 @@ pub fn build_run_args(
     inputs: &ResolvedHostInputs,
     command: &[String],
 ) -> Vec<String> {
-    let mut args = base_run_args(config, &project_root, inputs, false);
+    let mut args = base_run_args(config, &project_root, inputs, RunMode::Stdin);
     args.push(config.campfire.image.clone());
     args.extend(command.iter().cloned());
     args
@@ -44,12 +50,14 @@ fn base_run_args(
     config: &CampfireConfig,
     project_root: &Path,
     inputs: &ResolvedHostInputs,
-    interactive: bool,
+    mode: RunMode,
 ) -> Vec<String> {
     let mut args = vec!["run".to_string(), "--rm".to_string()];
 
-    if interactive {
-        args.push("-it".to_string());
+    match mode {
+        RunMode::InteractiveTty => args.push("-it".to_string()),
+        RunMode::Stdin => args.push("-i".to_string()),
+        RunMode::NonInteractive => {}
     }
 
     args.extend(["--security-opt".to_string(), "label=disable".to_string()]);

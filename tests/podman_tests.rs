@@ -99,7 +99,7 @@ contains = "aws-cli/2.15."
 }
 
 #[test]
-fn builds_non_interactive_run_arguments() {
+fn builds_stdin_open_run_arguments_without_tty() {
     let config: CampfireConfig = toml::from_str(
         r#"
 [campfire]
@@ -124,6 +124,7 @@ image = "fedora"
         vec![
             "run",
             "--rm",
+            "-i",
             "--security-opt",
             "label=disable",
             "--workdir",

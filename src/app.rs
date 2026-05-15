@@ -126,7 +126,8 @@ fn load_session() -> Result<Session> {
         .to_path_buf();
     let config = load_config(&config_path)?;
     let context = HostContext::current();
-    let inputs = validate_host_inputs(&config, &context).map_err(format_host_input_error)?;
+    let inputs =
+        validate_host_inputs(&config, &context, &project_root).map_err(format_host_input_error)?;
 
     Ok(Session {
         config,

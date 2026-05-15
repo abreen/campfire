@@ -50,7 +50,7 @@ readonly = ["~/.aws/config", "~/.aws/missing"]
         home.clone(),
     );
 
-    let resolved = validate_host_inputs(&config, &context).expect("inputs resolve");
+    let resolved = validate_host_inputs(&config, &context, temp.path()).expect("inputs resolve");
 
     assert_eq!(resolved.env["AWS_PROFILE"], "dev");
     assert_eq!(resolved.env["AWS_REGION"], "us-east-1");
@@ -83,7 +83,8 @@ required_readonly = ["~/.aws/credentials"]
         home.clone(),
     );
 
-    let error = validate_host_inputs(&config, &context).expect_err("missing inputs fail");
+    let error =
+        validate_host_inputs(&config, &context, temp.path()).expect_err("missing inputs fail");
 
     assert_eq!(error.missing_env, vec!["AWS_REGION"]);
     assert_eq!(error.missing_files, vec![home.join(".aws/credentials")]);

@@ -266,6 +266,43 @@ required_readonly = ["~/.aws/credentials"]
 }
 
 #[test]
+fn enter_resolves_relative_readonly_files_from_project_root_when_run_in_subdir() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    let nested = project.path().join("services/api");
+    let config_dir = project.path().join("config");
+    let settings = config_dir.join("settings.toml");
+    fs::create_dir_all(&nested).expect("nested dirs");
+    fs::create_dir_all(&config_dir).expect("config dir");
+    fs::write(&settings, "api_key = \"test\"\n").expect("settings");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[files]
+required_readonly = ["config/settings.toml"]
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "entered");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(&nested)
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .arg("enter")
+        .assert()
+        .success();
+
+    let calls = fs::read_to_string(log).expect("podman log");
+    assert!(calls.contains(&format!("{}:{}:ro", settings.display(), settings.display())));
+}
+
+#[test]
 fn run_executes_podman_with_user_command() {
     let project = tempfile::tempdir().expect("project tempdir");
     fs::write(

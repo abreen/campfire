@@ -57,6 +57,7 @@ pub fn expand_user_path(raw: &str, home: &Path) -> PathBuf {
 pub fn validate_host_inputs(
     config: &CampfireConfig,
     context: &HostContext,
+    project_root: &Path,
 ) -> Result<ResolvedHostInputs, HostInputError> {
     let mut env = BTreeMap::new();
     let mut missing_env = Vec::new();
@@ -84,14 +85,14 @@ pub fn validate_host_inputs(
     let mut missing_files = Vec::new();
 
     for raw in &config.files.readonly {
-        let path = expand_user_path(raw, &context.home);
+        let path = resolve_configured_file_path(raw, &context.home, project_root);
         if path.exists() {
             push_unique(&mut readonly_files, path);
         }
     }
 
     for raw in &config.files.required_readonly {
-        let path = expand_user_path(raw, &context.home);
+        let path = resolve_configured_file_path(raw, &context.home, project_root);
         if path.exists() {
             push_unique(&mut readonly_files, path);
         } else {
@@ -109,6 +110,15 @@ pub fn validate_host_inputs(
             missing_env,
             missing_files,
         })
+    }
+}
+
+fn resolve_configured_file_path(raw: &str, home: &Path, project_root: &Path) -> PathBuf {
+    let path = expand_user_path(raw, home);
+    if path.is_absolute() {
+        path
+    } else {
+        project_root.join(path)
     }
 }
 

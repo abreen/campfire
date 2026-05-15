@@ -385,6 +385,104 @@ image = "fedora"
 }
 
 #[test]
+fn run_executes_configured_command_by_name() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+shell = "/bin/bash"
+
+[commands.gs]
+run = "git status"
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "ran");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .args(["run", "gs", "-sb"])
+        .assert()
+        .success();
+
+    let calls = fs::read_to_string(log).expect("podman log");
+    assert!(calls.contains("fedora /bin/bash -lc git status '-sb'"));
+}
+
+#[test]
+fn run_delimiter_forces_raw_command_when_name_conflicts() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[commands.sh]
+run = "echo configured"
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "ran");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .args(["run", "--", "sh", "-lc", "echo raw"])
+        .assert()
+        .success();
+
+    let calls = fs::read_to_string(log).expect("podman log");
+    assert!(calls.contains("fedora sh -lc echo raw"));
+    assert!(!calls.contains("echo configured"));
+}
+
+#[test]
+fn check_rejects_invalid_command_names_before_running_podman() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[commands.bad-name]
+run = "git status"
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "unused");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .arg("check")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid command name `bad-name`"));
+
+    assert!(
+        !log.exists(),
+        "podman should not run when config validation fails"
+    );
+}
+
+#[test]
 fn run_propagates_podman_exit_code() {
     let project = tempfile::tempdir().expect("project tempdir");
     fs::write(

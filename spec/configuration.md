@@ -66,6 +66,22 @@ Each `tools.NAME` section describes a validation command for `cf check`.
 Tool checks should be quick. They are meant to answer whether expected tools and
 versions are present, not to run a full project test suite.
 
+## Commands Section
+
+Each `commands.NAME` section describes a reusable project command. Commands are
+similar to `package.json` scripts, but they execute inside the campfire
+environment with the configured image, tools, environment variables, files, and
+workspace mount.
+
+- `run` is the shell command snippet.
+- `description` is optional human-readable metadata.
+
+Command names must be portable shell function names:
+`[A-Za-z_][A-Za-z0-9_]*`.
+
+Extra arguments are appended when a command runs. For example, if `status` runs
+`git status`, then `cf run status -sb` runs like `git status -sb`.
+
 ## Example
 
 ```toml
@@ -88,4 +104,12 @@ required_readonly = ["~/.aws/credentials", "config/project.env"]
 [tools.aws]
 check = "aws --version"
 contains = "aws-cli/2."
+
+[commands.status]
+run = "git status"
+description = "Show repository status"
+
+[commands.test]
+run = "cargo test"
+description = "Run the project test suite inside the campfire"
 ```

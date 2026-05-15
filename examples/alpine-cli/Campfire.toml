@@ -19,3 +19,11 @@ contains = "BusyBox v1.36.1"
 [tools.env]
 check = "test \"$CAMPFIRE_EXAMPLE\" = \"alpine-cli\" && echo campfire-env-ok"
 contains = "campfire-env-ok"
+
+[commands.versions]
+run = "cat /etc/alpine-release && busybox | head -n 1"
+description = "Print pinned Alpine and BusyBox versions"
+
+[commands.write_note]
+run = "printf 'written inside campfire\n' > /workspace/generated.txt"
+description = "Write a host-visible file from inside campfire"

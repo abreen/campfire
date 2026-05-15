@@ -164,6 +164,53 @@ contains = "relative-secret-ok"
         .stdout(predicate::str::contains("Campfire check passed"));
 }
 
+#[test]
+fn real_podman_named_commands_run_with_workspace_and_stdin() {
+    if skip_unless_enabled() {
+        return;
+    }
+
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        format!(
+            r#"
+[campfire]
+image = "{}"
+
+[commands.write_note]
+run = "printf named-write > /workspace/named.txt"
+
+[commands.capture]
+run = "cat > /workspace/named-stdin.txt"
+"#,
+            podman_test_image()
+        ),
+    )
+    .expect("write config");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .args(["run", "write_note"])
+        .assert()
+        .success();
+
+    let written = fs::read_to_string(project.path().join("named.txt")).expect("read file");
+    assert_eq!(written, "named-write");
+
+    let mut command = Command::cargo_bin("cf").expect("cf binary");
+    command
+        .current_dir(project.path())
+        .args(["run", "capture"])
+        .write_stdin("named-stdin")
+        .assert()
+        .success();
+
+    let written = fs::read_to_string(project.path().join("named-stdin.txt")).expect("read file");
+    assert_eq!(written, "named-stdin");
+}
+
 fn skip_unless_enabled() -> bool {
     if std::env::var("CAMPFIRE_RUN_PODMAN_TESTS").ok().as_deref() == Some("1") {
         return false;

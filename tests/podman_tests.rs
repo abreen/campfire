@@ -3,7 +3,10 @@ use std::path::PathBuf;
 
 use campfire::config::CampfireConfig;
 use campfire::host::ResolvedHostInputs;
-use campfire::podman::{build_enter_args, build_run_args, build_tool_check_args};
+use campfire::podman::{
+    EnterShellSetup, build_enter_args, build_enter_args_with_setup, build_named_run_args,
+    build_run_args, build_tool_check_args,
+};
 
 #[test]
 fn builds_interactive_enter_arguments() {
@@ -140,6 +143,146 @@ image = "fedora"
             "sh",
             "-lc",
             "echo hi",
+        ]
+    );
+}
+
+#[test]
+fn builds_named_run_arguments_through_configured_shell() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+shell = "/bin/bash"
+
+[commands.gs]
+run = "git status"
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::new(),
+        readonly_files: vec![],
+    };
+
+    let args = build_named_run_args(
+        &config,
+        PathBuf::from("/repo"),
+        &inputs,
+        &config.commands["gs"],
+        &["-sb".to_string(), "it's".to_string()],
+    );
+
+    assert_eq!(
+        args,
+        vec![
+            "run",
+            "--rm",
+            "-i",
+            "--security-opt",
+            "label=disable",
+            "--workdir",
+            "/workspace",
+            "--volume",
+            "/repo:/workspace:rw",
+            "fedora",
+            "/bin/bash",
+            "-lc",
+            "git status '-sb' 'it'\\''s'",
+        ]
+    );
+}
+
+#[test]
+fn builds_enter_arguments_with_posix_command_setup() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+shell = "/bin/sh"
+
+[commands.versions]
+run = "cat /etc/alpine-release"
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::new(),
+        readonly_files: vec![],
+    };
+    let setup = EnterShellSetup {
+        host_path: PathBuf::from("/home/alex/.cache/campfire/commands.sh"),
+        container_path: "/tmp/campfire-commands.sh".to_string(),
+    };
+
+    let args = build_enter_args_with_setup(&config, PathBuf::from("/repo"), &inputs, &setup);
+
+    assert_eq!(
+        args,
+        vec![
+            "run",
+            "--rm",
+            "-it",
+            "--security-opt",
+            "label=disable",
+            "--workdir",
+            "/workspace",
+            "--volume",
+            "/repo:/workspace:rw",
+            "--volume",
+            "/home/alex/.cache/campfire/commands.sh:/tmp/campfire-commands.sh:ro",
+            "--env",
+            "ENV=/tmp/campfire-commands.sh",
+            "fedora",
+            "/bin/sh",
+            "-i",
+        ]
+    );
+}
+
+#[test]
+fn builds_enter_arguments_with_bash_command_setup() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+shell = "/bin/bash"
+
+[commands.versions]
+run = "cat /etc/alpine-release"
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::new(),
+        readonly_files: vec![],
+    };
+    let setup = EnterShellSetup {
+        host_path: PathBuf::from("/home/alex/.cache/campfire/commands.sh"),
+        container_path: "/tmp/campfire-commands.sh".to_string(),
+    };
+
+    let args = build_enter_args_with_setup(&config, PathBuf::from("/repo"), &inputs, &setup);
+
+    assert_eq!(
+        args,
+        vec![
+            "run",
+            "--rm",
+            "-it",
+            "--security-opt",
+            "label=disable",
+            "--workdir",
+            "/workspace",
+            "--volume",
+            "/repo:/workspace:rw",
+            "--volume",
+            "/home/alex/.cache/campfire/commands.sh:/tmp/campfire-commands.sh:ro",
+            "fedora",
+            "/bin/bash",
+            "--rcfile",
+            "/tmp/campfire-commands.sh",
+            "-i",
         ]
     );
 }

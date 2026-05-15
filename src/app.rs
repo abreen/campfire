@@ -1,13 +1,20 @@
+use std::env;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 
-use crate::config::{CampfireConfig, discover_config};
+use crate::commands::render_shell_functions;
+use crate::config::{CampfireConfig, discover_config, validate_config};
 use crate::host::{HostContext, HostInputError, ResolvedHostInputs, validate_host_inputs};
-use crate::podman::{build_enter_args, build_run_args, build_tool_check_args};
+use crate::podman::{
+    EnterShellSetup, build_enter_args, build_enter_args_with_setup, build_named_run_args,
+    build_run_args, build_tool_check_args,
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -41,7 +48,9 @@ enum Commands {
 }
 
 pub fn run() -> Result<i32> {
-    let cli = Cli::parse();
+    let raw_args = env::args_os().collect::<Vec<_>>();
+    let explicit_raw_run = run_uses_explicit_raw_command(&raw_args);
+    let cli = Cli::parse_from(&raw_args);
 
     match cli.command {
         Commands::Init { image } => {
@@ -58,18 +67,22 @@ pub fn run() -> Result<i32> {
         Commands::Enter => {
             let session = load_session()?;
             ensure_podman()?;
-            let args = build_enter_args(&session.config, session.project_root, &session.inputs);
+            let setup = create_shell_setup(&session.config)?;
+            let args = match &setup {
+                Some(setup) => build_enter_args_with_setup(
+                    &session.config,
+                    session.project_root,
+                    &session.inputs,
+                    &setup.enter_shell_setup(),
+                ),
+                None => build_enter_args(&session.config, session.project_root, &session.inputs),
+            };
             run_podman_status(args)
         }
         Commands::Run { command } => {
             let session = load_session()?;
             ensure_podman()?;
-            let args = build_run_args(
-                &session.config,
-                session.project_root,
-                &session.inputs,
-                &command,
-            );
+            let args = build_run_invocation_args(&session, &command, explicit_raw_run);
             run_podman_status(args)
         }
     }
@@ -125,6 +138,7 @@ fn load_session() -> Result<Session> {
         .context("Campfire.toml has no parent directory")?
         .to_path_buf();
     let config = load_config(&config_path)?;
+    validate_config(&config)?;
     let context = HostContext::current();
     let inputs =
         validate_host_inputs(&config, &context, &project_root).map_err(format_host_input_error)?;
@@ -134,6 +148,99 @@ fn load_session() -> Result<Session> {
         project_root,
         inputs,
     })
+}
+
+fn build_run_invocation_args(
+    session: &Session,
+    command: &[String],
+    explicit_raw_run: bool,
+) -> Vec<String> {
+    if !explicit_raw_run
+        && let Some((name, extra_args)) = command.split_first()
+        && let Some(snippet) = session.config.commands.get(name)
+    {
+        return build_named_run_args(
+            &session.config,
+            session.project_root.clone(),
+            &session.inputs,
+            snippet,
+            extra_args,
+        );
+    }
+
+    build_run_args(
+        &session.config,
+        session.project_root.clone(),
+        &session.inputs,
+        command,
+    )
+}
+
+fn run_uses_explicit_raw_command(args: &[OsString]) -> bool {
+    let run_index = args
+        .iter()
+        .skip(1)
+        .position(|arg| arg == OsStr::new("run"))
+        .map(|index| index + 1);
+
+    run_index
+        .and_then(|index| args.get(index + 1))
+        .is_some_and(|arg| arg == OsStr::new("--"))
+}
+
+struct ShellSetupFile {
+    host_path: PathBuf,
+    container_path: String,
+}
+
+impl ShellSetupFile {
+    fn enter_shell_setup(&self) -> EnterShellSetup {
+        EnterShellSetup {
+            host_path: self.host_path.clone(),
+            container_path: self.container_path.clone(),
+        }
+    }
+}
+
+impl Drop for ShellSetupFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.host_path);
+    }
+}
+
+fn create_shell_setup(config: &CampfireConfig) -> Result<Option<ShellSetupFile>> {
+    if config.commands.is_empty() {
+        return Ok(None);
+    }
+
+    let cache_dir = campfire_cache_dir();
+    fs::create_dir_all(&cache_dir)
+        .with_context(|| format!("failed to create {}", cache_dir.display()))?;
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is before UNIX epoch")?
+        .as_nanos();
+    let host_path = cache_dir.join(format!("commands-{}-{timestamp}.sh", std::process::id()));
+    fs::write(&host_path, render_shell_functions(&config.commands))
+        .with_context(|| format!("failed to write {}", host_path.display()))?;
+
+    Ok(Some(ShellSetupFile {
+        host_path,
+        container_path: "/tmp/campfire-commands.sh".to_string(),
+    }))
+}
+
+fn campfire_cache_dir() -> PathBuf {
+    if let Some(cache_home) = env::var_os("XDG_CACHE_HOME") {
+        return PathBuf::from(cache_home).join("campfire");
+    }
+
+    if let Some(home) = env::var_os("HOME") {
+        return PathBuf::from(home).join(".cache/campfire");
+    }
+
+    env::temp_dir().join("campfire")
 }
 
 fn load_config(path: &Path) -> Result<CampfireConfig> {

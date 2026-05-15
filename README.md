@@ -13,6 +13,8 @@ crates.io (`publish = false`).
 - A read-write project mount inside the container, usually at `/workspace`.
 - Optional or required host environment variables and read-only files.
 - A `cf check` command that validates Podman, required inputs, and configured tools.
+- Reusable project commands, similar to `package.json` scripts, that run inside
+  the campfire environment.
 
 ## Requirements
 
@@ -47,6 +49,12 @@ Run a one-off command in the Campfire environment:
 cf run -- sh -lc 'echo hello > /workspace/new-file.txt'
 ```
 
+Run a reusable project command from `Campfire.toml`:
+
+```sh
+cf run versions
+```
+
 ## Commands
 
 | Command | What it does |
@@ -54,7 +62,8 @@ cf run -- sh -lc 'echo hello > /workspace/new-file.txt'
 | `cf init --image IMAGE` | Writes a starter `Campfire.toml` in the current directory. |
 | `cf check` | Validates the config, required host inputs, Podman, and configured tool checks. |
 | `cf enter` | Starts an interactive shell inside the configured container. |
-| `cf run -- COMMAND ...` | Runs a command inside the configured container. |
+| `cf run NAME [ARGS...]` | Runs a configured command inside the container. |
+| `cf run -- COMMAND ...` | Runs a raw command inside the configured container. |
 
 Campfire looks for `Campfire.toml` in the current directory and then walks upward. The
 directory containing `Campfire.toml` is the project root.
@@ -90,6 +99,14 @@ required_readonly = ["~/.aws/credentials"]
 [tools.aws]
 check = "aws --version"
 contains = "aws-cli/2."
+
+[commands.status]
+run = "git status"
+description = "Show repository status"
+
+[commands.versions]
+run = "aws --version"
+description = "Show pinned tool versions"
 ```
 
 ### Config reference
@@ -111,8 +128,15 @@ contains = "aws-cli/2."
 - `[tools.NAME]`
   - `check` runs during `cf check` inside the container.
   - `contains` is optional and requires the combined stdout/stderr to contain the text.
+- `[commands.NAME]`
+  - `run` is a reusable shell command snippet, similar to a `package.json` script
+    but executed inside the campfire environment.
+  - `description` is optional metadata for humans and future help output.
+  - Extra args are appended, so `cf run status -sb` behaves like `git status -sb`.
 
 Read-only files are mounted at the same absolute path inside the container.
+Files written under the workspace path are available outside the campfire because
+the project root is mounted read-write.
 
 ## How the pieces fit together
 

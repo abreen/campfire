@@ -39,6 +39,10 @@ shell command mode. Checks should not allocate a TTY and do not need stdin.
 It uses the configured shell and allocates an interactive TTY. This is the normal
 human workflow for using project tools.
 
+Configured commands are exposed as shell functions inside the entered shell when
+the shell supports startup files. This makes snippets such as `status` or
+`versions` available like local aliases.
+
 ## `cf run`
 
 `cf run -- COMMAND ...` runs one command inside the campfire environment.
@@ -51,6 +55,15 @@ printf 'input' | cf run -- cat
 ```
 
 The command's exit status should become the `cf run` exit status when available.
+
+`cf run NAME [ARGS...]` runs a configured command snippet when `NAME` exists in
+the config. This is the non-interactive form of the same project commands
+exposed inside `cf enter`.
+
+These commands are similar to `package.json` scripts: they give the repository a
+shared vocabulary for common tasks. Unlike package scripts, they run inside the
+campfire container, so they use the pinned tool environment. Files written under
+the workspace path are written through to the host project.
 
 ## Podman Assumptions
 

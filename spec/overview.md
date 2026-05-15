@@ -16,6 +16,8 @@ inside the project.
 - Mount the project workspace read-write inside the environment.
 - Pass only selected host environment variables and files into the environment.
 - Validate required host inputs and expected tools before a user starts work.
+- Provide reusable project commands that act like package scripts inside the
+  campfire environment.
 - Keep behavior independent of Git when possible, while leaving room for future
   Git-aware campfire isolation.
 
@@ -40,6 +42,10 @@ the container.
 The project workspace is mounted read-write because editing code is the main
 workflow. Additional files are mounted read-only because credentials and host
 configuration should be available without being mutated by container tools.
+
+Reusable commands are the campfire equivalent of `package.json` scripts. They
+live in the project config, run inside the configured container, and can write
+files that immediately appear in the host workspace.
 
 ## Refresh Model
 

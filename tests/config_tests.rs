@@ -1,6 +1,6 @@
 use std::fs;
 
-use campfire::config::{CampfireConfig, discover_config};
+use campfire::config::{CampfireConfig, discover_config, validate_config};
 
 #[test]
 fn parses_compact_project_config() {
@@ -24,6 +24,10 @@ required_readonly = ["~/.aws/credentials"]
 [tools.aws]
 check = "aws --version"
 contains = "aws-cli/2.15."
+
+[commands.gs]
+run = "git status"
+description = "Show repository status"
 "#;
 
     let config: CampfireConfig = toml::from_str(source).expect("config parses");
@@ -40,6 +44,11 @@ contains = "aws-cli/2.15."
     assert_eq!(
         config.tools["aws"].contains.as_deref(),
         Some("aws-cli/2.15.")
+    );
+    assert_eq!(config.commands["gs"].run, "git status");
+    assert_eq!(
+        config.commands["gs"].description.as_deref(),
+        Some("Show repository status")
     );
 }
 
@@ -60,6 +69,26 @@ image = "registry.fedoraproject.org/fedora-toolbox:latest"
     assert!(config.files.readonly.is_empty());
     assert!(config.files.required_readonly.is_empty());
     assert!(config.tools.is_empty());
+    assert!(config.commands.is_empty());
+}
+
+#[test]
+fn rejects_invalid_command_names() {
+    let source = r#"
+[campfire]
+image = "fedora"
+
+[commands.bad-name]
+run = "git status"
+"#;
+
+    let config: CampfireConfig = toml::from_str(source).expect("config parses");
+    let error = validate_config(&config).expect_err("invalid command name fails");
+
+    assert_eq!(
+        error.to_string(),
+        "invalid command name `bad-name`: command names must match [A-Za-z_][A-Za-z0-9_]*"
+    );
 }
 
 #[test]

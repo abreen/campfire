@@ -54,6 +54,18 @@ Expected output includes:
 BusyBox v1.36.1
 ```
 
+## Run a Project Command
+
+Campfire commands are like `package.json` scripts, except they run inside the
+campfire environment instead of on the host. This example defines a reusable
+`versions` command in `Campfire.toml`:
+
+```sh
+cf run versions
+```
+
+It prints the same pinned Alpine and BusyBox versions as the raw command above.
+
 ## Read a Project File
 
 The current directory is mounted read-write at `/workspace` inside the
@@ -68,7 +80,7 @@ cf run -- cat /workspace/message.txt
 Create a file from inside the campfire:
 
 ```sh
-cf run -- sh -lc 'printf "written from the campfire\n" > /workspace/generated.txt'
+cf run write_note
 cat generated.txt
 ```
 
@@ -98,6 +110,7 @@ Inside the shell, try:
 pwd
 cat /etc/alpine-release
 busybox | head -n 1
+versions
 cat /workspace/message.txt
 exit
 ```

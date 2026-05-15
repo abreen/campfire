@@ -21,6 +21,8 @@ pub struct CampfireConfig {
     pub files: FilesSection,
     #[serde(default)]
     pub tools: BTreeMap<String, ToolCheck>,
+    #[serde(default)]
+    pub commands: BTreeMap<String, CommandSnippet>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -69,6 +71,29 @@ pub struct ToolCheck {
     pub contains: Option<String>,
 }
 
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct CommandSnippet {
+    pub run: String,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ConfigValidationError {
+    #[error("invalid command name `{name}`: command names must match [A-Za-z_][A-Za-z0-9_]*")]
+    InvalidCommandName { name: String },
+}
+
+pub fn validate_config(config: &CampfireConfig) -> Result<(), ConfigValidationError> {
+    for name in config.commands.keys() {
+        if !is_valid_command_name(name) {
+            return Err(ConfigValidationError::InvalidCommandName { name: name.clone() });
+        }
+    }
+
+    Ok(())
+}
+
 pub fn discover_config(start: impl AsRef<Path>) -> Result<PathBuf, ConfigError> {
     let mut current = start.as_ref();
 
@@ -95,4 +120,14 @@ fn default_shell() -> String {
 
 fn default_workspace_path() -> String {
     "/workspace".to_string()
+}
+
+fn is_valid_command_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(first) if first.is_ascii_alphabetic() || first == '_' => {}
+        _ => return false,
+    }
+
+    chars.all(|character| character.is_ascii_alphanumeric() || character == '_')
 }

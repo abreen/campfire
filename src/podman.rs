@@ -28,7 +28,7 @@ pub fn build_tool_check_args(
 ) -> Vec<String> {
     let mut args = base_run_args(config, &project_root, inputs, RunMode::NonInteractive);
     args.push(config.campfire.image.clone());
-    args.push("/bin/sh".to_string());
+    args.push(config.campfire.shell.clone());
     args.push("-lc".to_string());
     args.push(tool.check.clone());
     args

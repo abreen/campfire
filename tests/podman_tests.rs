@@ -58,6 +58,7 @@ fn builds_non_interactive_tool_check_arguments() {
         r#"
 [campfire]
 image = "fedora"
+shell = "/bin/bash"
 
 [tools.aws]
 check = "aws --version"
@@ -91,7 +92,7 @@ contains = "aws-cli/2.15."
             "--env",
             "AWS_PROFILE=dev",
             "fedora",
-            "/bin/sh",
+            "/bin/bash",
             "-lc",
             "aws --version",
         ]

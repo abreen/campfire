@@ -18,7 +18,9 @@ impl HostContext {
     }
 
     pub fn current() -> Self {
-        let env = env::vars().collect();
+        let env = env::vars_os()
+            .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
+            .collect();
         let home = env::var_os("HOME")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("/"));

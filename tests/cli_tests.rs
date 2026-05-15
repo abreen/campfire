@@ -1,4 +1,6 @@
+use std::ffi::OsString;
 use std::fs;
+use std::os::unix::ffi::OsStringExt;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
@@ -97,6 +99,40 @@ required = ["AWS_PROFILE"]
         !log.exists(),
         "podman should not run when host inputs are missing"
     );
+}
+
+#[test]
+fn check_ignores_unrelated_non_utf8_env_vars() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[tools.aws]
+check = "aws --version"
+contains = "aws-cli/2.15."
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "aws-cli/2.15.99 Python/3.11");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .env(
+            OsString::from_vec(b"CAMPFIRE_\xFF_UNRELATED".to_vec()),
+            OsString::from_vec(b"ignored-\xFF-value".to_vec()),
+        )
+        .arg("check")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Campfire check passed"));
 }
 
 #[test]

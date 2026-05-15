@@ -1,5 +1,6 @@
 use std::fs;
 
+use assert_cmd::Command;
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 
@@ -83,6 +84,84 @@ image = "{}"
 
     let written = fs::read_to_string(project.path().join("new-file.txt")).expect("read file");
     assert_eq!(written, "campfire-write");
+}
+
+#[test]
+fn real_podman_run_preserves_stdin() {
+    if skip_unless_enabled() {
+        return;
+    }
+
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        format!(
+            r#"
+[campfire]
+image = "{}"
+"#,
+            podman_test_image()
+        ),
+    )
+    .expect("write config");
+
+    let mut command = Command::cargo_bin("cf").expect("cf binary");
+    command
+        .current_dir(project.path())
+        .args(["run", "--", "sh", "-lc", "cat > /workspace/stdin.txt"])
+        .write_stdin("campfire-stdin")
+        .assert()
+        .success();
+
+    let written = fs::read_to_string(project.path().join("stdin.txt")).expect("read file");
+    assert_eq!(written, "campfire-stdin");
+}
+
+#[test]
+fn real_podman_check_reads_project_relative_required_file_from_subdir() {
+    if skip_unless_enabled() {
+        return;
+    }
+
+    let project = tempfile::tempdir().expect("project tempdir");
+    let nested = project.path().join("services/api");
+    let config_dir = project.path().join("config");
+    let secret = config_dir.join("secret.txt");
+    fs::create_dir_all(&nested).expect("nested dir");
+    fs::create_dir_all(&config_dir).expect("config dir");
+    fs::write(&secret, "campfire-relative-secret").expect("secret file");
+
+    let image = podman_test_image();
+    let secret = secret.canonicalize().expect("canonical secret path");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        format!(
+            r#"
+[campfire]
+image = "{image}"
+
+[env]
+set = {{ CAMPFIRE_RELATIVE_SECRET = "{}" }}
+
+[files]
+required_readonly = ["config/secret.txt"]
+
+[tools.secret]
+check = "test \"$(cat \"$CAMPFIRE_RELATIVE_SECRET\")\" = \"campfire-relative-secret\" && echo relative-secret-ok"
+contains = "relative-secret-ok"
+"#,
+            secret.display()
+        ),
+    )
+    .expect("write config");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(nested)
+        .arg("check")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Campfire check passed"));
 }
 
 fn skip_unless_enabled() -> bool {

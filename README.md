@@ -116,6 +116,11 @@ Read-only files are mounted at the same absolute path inside the container.
 - `tests/` covers CLI behavior, config parsing, host input resolution, Podman argument
   building, and opt-in real Podman integration tests.
 
+## Specs
+
+Design notes live in `spec/`. They describe intended behavior without tying that
+behavior to a specific Rust implementation.
+
 ## Development
 
 Run the same checks as CI before opening a PR:

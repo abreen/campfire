@@ -60,6 +60,37 @@ readonly = ["~/.aws/config", "~/.aws/missing"]
 }
 
 #[test]
+fn resolves_relative_readonly_files_from_project_root() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let project_root = temp.path().join("project");
+    let home = temp.path().join("home/alex");
+    let config_dir = project_root.join("config");
+    let optional = config_dir.join("optional.toml");
+    let required = config_dir.join("required.toml");
+    fs::create_dir_all(&config_dir).expect("config dir");
+    fs::create_dir_all(&home).expect("home dir");
+    fs::write(&optional, "optional = true\n").expect("optional file");
+    fs::write(&required, "required = true\n").expect("required file");
+
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+
+[files]
+readonly = ["config/optional.toml", "config/missing.toml"]
+required_readonly = ["config/required.toml"]
+"#,
+    )
+    .expect("config parses");
+    let context = HostContext::new(BTreeMap::new(), home);
+
+    let resolved = validate_host_inputs(&config, &context, &project_root).expect("inputs resolve");
+
+    assert_eq!(resolved.readonly_files, vec![optional, required]);
+}
+
+#[test]
 fn reports_missing_required_env_and_files_together() {
     let temp = tempfile::tempdir().expect("tempdir");
     let home = temp.path().join("home/alex");

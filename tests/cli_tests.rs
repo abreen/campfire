@@ -26,6 +26,24 @@ fn init_writes_starter_config() {
 }
 
 #[test]
+fn init_refuses_to_overwrite_existing_config() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        "[campfire]\nimage = \"fedora\"\n",
+    )
+    .expect("write config");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .args(["init", "--image", "alpine"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Campfire.toml already exists"));
+}
+
+#[test]
 fn check_uses_fake_podman_and_validates_tool_output() {
     let project = tempfile::tempdir().expect("project tempdir");
     fs::write(
@@ -62,6 +80,39 @@ contains = "aws-cli/2.15."
     let calls = fs::read_to_string(log).expect("podman log");
     assert!(calls.contains("--version"));
     assert!(calls.contains("aws --version"));
+}
+
+#[test]
+fn check_fails_when_tool_output_does_not_contain_expected_text() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[tools.aws]
+check = "aws --version"
+contains = "aws-cli/2.15."
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "aws-cli/1.32.0 Python/3.11");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .arg("check")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "tool check `aws` did not contain `aws-cli/2.15.`",
+        ))
+        .stderr(predicate::str::contains("aws-cli/1.32.0"));
 }
 
 #[test]

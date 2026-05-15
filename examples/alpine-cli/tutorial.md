@@ -87,6 +87,24 @@ cat generated.txt
 The `cat` command runs on your host. It can read `generated.txt` because the
 campfire wrote through the `/workspace` mount.
 
+## Serve a Local Port
+
+Start a tiny BusyBox `nc` HTTP response loop inside the campfire:
+
+```sh
+cf run serve_http
+```
+
+In another terminal on the host, fetch the published localhost port:
+
+```sh
+curl http://127.0.0.1:18080/message.txt
+```
+
+The server listens inside the container on port `8080`. Campfire publishes it to
+host port `18080` because this example defines a `[[ports]]` entry. Stop the
+server with `Ctrl-C`.
+
 ## Pipe Input Into the Campfire
 
 `cf run` keeps stdin open, so host pipelines work:

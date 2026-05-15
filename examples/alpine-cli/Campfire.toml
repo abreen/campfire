@@ -27,3 +27,11 @@ description = "Print pinned Alpine and BusyBox versions"
 [commands.write_note]
 run = "printf 'written inside campfire\n' > /workspace/generated.txt"
 description = "Write a host-visible file from inside campfire"
+
+[commands.serve_http]
+run = "while true; do { printf 'HTTP/1.1 200 OK\\r\\nConnection: close\\r\\n\\r\\n'; cat /workspace/message.txt; } | nc -l -p 8080; done"
+description = "Serve this example directory from inside campfire"
+
+[[ports]]
+container = 8080
+host = 18080

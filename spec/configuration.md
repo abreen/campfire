@@ -82,6 +82,22 @@ Command names must be portable shell function names:
 Extra arguments are appended when a command runs. For example, if `status` runs
 `git status`, then `cf run status -sb` runs like `git status -sb`.
 
+## Ports Section
+
+Each `[[ports]]` entry publishes one TCP port from the container to the host for
+`cf enter` and `cf run`.
+
+- `container` is required and must be between `1` and `65535`.
+- `host` is optional, must be between `1` and `65535`, and defaults to the same
+  value as `container`.
+- `bind` is optional, must be an IP address, and defaults to `127.0.0.1`.
+
+The localhost default keeps dev servers private to the user's machine. Projects
+that intentionally need LAN access can set `bind = "0.0.0.0"`.
+
+Ports are not published for `cf check` because tool validation should not fail
+just because a developer already has a local server running.
+
 ## Example
 
 ```toml
@@ -112,4 +128,11 @@ description = "Show repository status"
 [commands.test]
 run = "cargo test"
 description = "Run the project test suite inside the campfire"
+
+[commands.serve]
+run = "python -m http.server 8080 --bind 0.0.0.0"
+description = "Start a local dev server"
+
+[[ports]]
+container = 8080
 ```

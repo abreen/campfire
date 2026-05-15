@@ -15,6 +15,7 @@ crates.io (`publish = false`).
 - A `cf check` command that validates Podman, required inputs, and configured tools.
 - Reusable project commands, similar to `package.json` scripts, that run inside
   the campfire environment.
+- Optional localhost port publishing for dev servers started inside the campfire.
 
 ## Requirements
 
@@ -107,6 +108,13 @@ description = "Show repository status"
 [commands.versions]
 run = "aws --version"
 description = "Show pinned tool versions"
+
+[commands.serve]
+run = "python -m http.server 8080 --bind 0.0.0.0"
+description = "Start the project dev server"
+
+[[ports]]
+container = 8080
 ```
 
 ### Config reference
@@ -133,10 +141,22 @@ description = "Show pinned tool versions"
     but executed inside the campfire environment.
   - `description` is optional metadata for humans and future help output.
   - Extra args are appended, so `cf run status -sb` behaves like `git status -sb`.
+- `[[ports]]`
+  - `container` is the required TCP port inside the container.
+  - `host` defaults to the same value as `container`.
+  - `bind` defaults to `127.0.0.1` for local-only access.
+  - Ports are published for `cf enter` and `cf run`, not for `cf check`.
 
 Read-only files are mounted at the same absolute path inside the container.
 Files written under the workspace path are available outside the campfire because
 the project root is mounted read-write.
+
+For a configured dev server, run the project command and open the host port:
+
+```sh
+cf run serve
+curl http://127.0.0.1:8080
+```
 
 ## How the pieces fit together
 
@@ -185,5 +205,7 @@ You can override the integration-test image with `CAMPFIRE_PODMAN_TEST_IMAGE`.
 - `missing required env vars`: export the variables listed in the error.
 - `missing required files`: create the listed files or update `required_readonly`.
 - `podman is not installed or not on PATH`: install Podman or update `PATH`.
+- `address already in use`: change the configured `host` port or stop the other
+  process using it.
 - SELinux bind mounts on Fedora Silverblue are expected to work because Campfire passes
   `--security-opt label=disable` to Podman.

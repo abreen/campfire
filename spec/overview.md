@@ -18,6 +18,8 @@ inside the project.
 - Validate required host inputs and expected tools before a user starts work.
 - Provide reusable project commands that act like package scripts inside the
   campfire environment.
+- Let projects expose local dev servers from inside the campfire through
+  explicit localhost port publishing.
 - Keep behavior independent of Git when possible, while leaving room for future
   Git-aware campfire isolation.
 
@@ -46,6 +48,10 @@ configuration should be available without being mutated by container tools.
 Reusable commands are the campfire equivalent of `package.json` scripts. They
 live in the project config, run inside the configured container, and can write
 files that immediately appear in the host workspace.
+
+Published ports are the bridge for local dev servers. A server can run with the
+pinned tools and environment inside the campfire while the host browser or CLI
+talks to `127.0.0.1` on the configured host port.
 
 ## Refresh Model
 

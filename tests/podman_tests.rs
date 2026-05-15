@@ -148,6 +148,129 @@ image = "fedora"
 }
 
 #[test]
+fn builds_enter_arguments_with_configured_ports() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+
+[[ports]]
+container = 3000
+host = 13000
+bind = "0.0.0.0"
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::new(),
+        readonly_files: vec![],
+    };
+
+    let args = build_enter_args(&config, PathBuf::from("/repo"), &inputs);
+
+    assert_eq!(
+        args,
+        vec![
+            "run",
+            "--rm",
+            "-it",
+            "--security-opt",
+            "label=disable",
+            "--publish",
+            "127.0.0.1:8080:8080",
+            "--publish",
+            "0.0.0.0:13000:3000",
+            "--workdir",
+            "/workspace",
+            "--volume",
+            "/repo:/workspace:rw",
+            "fedora",
+            "/bin/sh",
+        ]
+    );
+}
+
+#[test]
+fn builds_run_arguments_with_configured_ports() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::new(),
+        readonly_files: vec![],
+    };
+
+    let args = build_run_args(
+        &config,
+        PathBuf::from("/repo"),
+        &inputs,
+        &["sh".to_string(), "-lc".to_string(), "echo hi".to_string()],
+    );
+
+    assert_eq!(
+        args,
+        vec![
+            "run",
+            "--rm",
+            "-i",
+            "--security-opt",
+            "label=disable",
+            "--publish",
+            "127.0.0.1:8080:8080",
+            "--workdir",
+            "/workspace",
+            "--volume",
+            "/repo:/workspace:rw",
+            "fedora",
+            "sh",
+            "-lc",
+            "echo hi",
+        ]
+    );
+}
+
+#[test]
+fn omits_configured_ports_from_tool_check_arguments() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+
+[tools.server]
+check = "true"
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::new(),
+        readonly_files: vec![],
+    };
+
+    let args = build_tool_check_args(
+        &config,
+        PathBuf::from("/repo"),
+        &inputs,
+        &config.tools["server"],
+    );
+
+    assert!(!args.iter().any(|arg| arg == "--publish"));
+    assert!(!args.iter().any(|arg| arg == "127.0.0.1:8080:8080"));
+}
+
+#[test]
 fn builds_named_run_arguments_through_configured_shell() {
     let config: CampfireConfig = toml::from_str(
         r#"
@@ -189,6 +312,56 @@ run = "git status"
             "/bin/bash",
             "-lc",
             "git status '-sb' 'it'\\''s'",
+        ]
+    );
+}
+
+#[test]
+fn builds_named_run_arguments_with_configured_ports() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+
+[commands.serve]
+run = "busybox httpd -f -p 0.0.0.0:8080"
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::new(),
+        readonly_files: vec![],
+    };
+
+    let args = build_named_run_args(
+        &config,
+        PathBuf::from("/repo"),
+        &inputs,
+        &config.commands["serve"],
+        &[],
+    );
+
+    assert_eq!(
+        args,
+        vec![
+            "run",
+            "--rm",
+            "-i",
+            "--security-opt",
+            "label=disable",
+            "--publish",
+            "127.0.0.1:8080:8080",
+            "--workdir",
+            "/workspace",
+            "--volume",
+            "/repo:/workspace:rw",
+            "fedora",
+            "/bin/sh",
+            "-lc",
+            "busybox httpd -f -p 0.0.0.0:8080",
         ]
     );
 }

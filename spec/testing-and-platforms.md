@@ -23,6 +23,7 @@ These tests should cover:
 - early validation before Podman runs,
 - environment refresh across invocations,
 - file refresh across invocations,
+- configured port publishing flags for user-facing runs,
 - generated Podman arguments that matter to users.
 
 Fake Podman tests should not try to prove that real containers work.
@@ -38,6 +39,8 @@ They should cover behavior that fake Podman cannot prove:
 - host env and read-only files are visible inside the container,
 - `cf run` preserves stdin through the real container process,
 - project-root-relative files work when `cf` is run from a subdirectory.
+- a server inside `cf run` is reachable from the host through a configured
+  published localhost port.
 
 The default integration image should be small and available on common platforms.
 Projects can override the image when needed.

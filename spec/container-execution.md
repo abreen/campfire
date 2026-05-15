@@ -16,6 +16,11 @@ Additional files are mounted read-only at their resolved host paths.
 
 Selected environment variables and fixed values are passed explicitly.
 
+Configured ports are published for developer-facing runs. The default bind
+address is `127.0.0.1`, so services are reachable from the host machine without
+being exposed to the local network unless the project opts into a wider bind
+address.
+
 Campfire should fail early before running Podman when required host inputs are
 missing.
 
@@ -31,6 +36,7 @@ missing.
 
 Tool checks run inside the configured image using the configured shell with
 shell command mode. Checks should not allocate a TTY and do not need stdin.
+Configured ports are not published for tool checks.
 
 ## `cf enter`
 
@@ -38,6 +44,10 @@ shell command mode. Checks should not allocate a TTY and do not need stdin.
 
 It uses the configured shell and allocates an interactive TTY. This is the normal
 human workflow for using project tools.
+
+Configured ports are published. If a process inside the shell listens on the
+configured container port, the user can reach it through the configured host
+port.
 
 Configured commands are exposed as shell functions inside the entered shell when
 the shell supports startup files. This makes snippets such as `status` or
@@ -56,6 +66,9 @@ printf 'input' | cf run -- cat
 
 The command's exit status should become the `cf run` exit status when available.
 
+Configured ports are published. Long-running commands such as dev servers can be
+reached from the host while the `cf run` process is still running.
+
 `cf run NAME [ARGS...]` runs a configured command snippet when `NAME` exists in
 the config. This is the non-interactive form of the same project commands
 exposed inside `cf enter`.
@@ -64,6 +77,10 @@ These commands are similar to `package.json` scripts: they give the repository a
 shared vocabulary for common tasks. Unlike package scripts, they run inside the
 campfire container, so they use the pinned tool environment. Files written under
 the workspace path are written through to the host project.
+
+Server processes should listen on the configured container port and on an
+address reachable inside the container, such as `0.0.0.0`, when they need to be
+reachable from the host through published ports.
 
 ## Podman Assumptions
 

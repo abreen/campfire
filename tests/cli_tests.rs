@@ -221,6 +221,37 @@ path = "/workspace"
 }
 
 #[test]
+fn enter_publishes_configured_ports() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "entered");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .arg("enter")
+        .assert()
+        .success();
+
+    let calls = fs::read_to_string(log).expect("podman log");
+    assert!(calls.contains("--publish 127.0.0.1:8080:8080"));
+}
+
+#[test]
 fn enter_refreshes_passed_env_between_invocations() {
     let project = tempfile::tempdir().expect("project tempdir");
     fs::write(
@@ -385,6 +416,38 @@ image = "fedora"
 }
 
 #[test]
+fn run_publishes_configured_ports() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+host = 18080
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "ran");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .args(["run", "--", "sh", "-lc", "echo hi"])
+        .assert()
+        .success();
+
+    let calls = fs::read_to_string(log).expect("podman log");
+    assert!(calls.contains("--publish 127.0.0.1:18080:8080"));
+}
+
+#[test]
 fn run_executes_configured_command_by_name() {
     let project = tempfile::tempdir().expect("project tempdir");
     fs::write(
@@ -475,6 +538,41 @@ run = "git status"
         .assert()
         .failure()
         .stderr(predicate::str::contains("invalid command name `bad-name`"));
+
+    assert!(
+        !log.exists(),
+        "podman should not run when config validation fails"
+    );
+}
+
+#[test]
+fn check_rejects_invalid_ports_before_running_podman() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+bind = "localhost"
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "unused");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .arg("check")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid bind address `localhost`"));
 
     assert!(
         !log.exists(),

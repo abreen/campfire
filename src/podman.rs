@@ -10,6 +10,12 @@ enum RunMode {
     NonInteractive,
 }
 
+impl RunMode {
+    fn publishes_ports(&self) -> bool {
+        matches!(self, Self::InteractiveTty | Self::Stdin)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnterShellSetup {
     pub host_path: PathBuf,
@@ -121,6 +127,18 @@ fn base_run_args(
     }
 
     args.extend(["--security-opt".to_string(), "label=disable".to_string()]);
+
+    if mode.publishes_ports() {
+        for port in &config.ports {
+            args.push("--publish".to_string());
+            args.push(format!(
+                "{}:{}:{}",
+                port.bind_address(),
+                port.host_port(),
+                port.container
+            ));
+        }
+    }
 
     args.extend([
         "--workdir".to_string(),

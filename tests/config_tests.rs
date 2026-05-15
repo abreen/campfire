@@ -1,6 +1,6 @@
 use std::fs;
 
-use campfire::config::{CampfireConfig, discover_config, validate_config};
+use campfire::config::{CampfireConfig, ConfigValidationError, discover_config, validate_config};
 
 #[test]
 fn parses_compact_project_config() {
@@ -28,6 +28,14 @@ contains = "aws-cli/2.15."
 [commands.gs]
 run = "git status"
 description = "Show repository status"
+
+[[ports]]
+container = 8080
+host = 18080
+bind = "0.0.0.0"
+
+[[ports]]
+container = 3000
 "#;
 
     let config: CampfireConfig = toml::from_str(source).expect("config parses");
@@ -50,6 +58,13 @@ description = "Show repository status"
         config.commands["gs"].description.as_deref(),
         Some("Show repository status")
     );
+    assert_eq!(config.ports.len(), 2);
+    assert_eq!(config.ports[0].container, 8080);
+    assert_eq!(config.ports[0].host_port(), 18080);
+    assert_eq!(config.ports[0].bind_address(), "0.0.0.0");
+    assert_eq!(config.ports[1].container, 3000);
+    assert_eq!(config.ports[1].host_port(), 3000);
+    assert_eq!(config.ports[1].bind_address(), "127.0.0.1");
 }
 
 #[test]
@@ -70,6 +85,7 @@ image = "registry.fedoraproject.org/fedora-toolbox:latest"
     assert!(config.files.required_readonly.is_empty());
     assert!(config.tools.is_empty());
     assert!(config.commands.is_empty());
+    assert!(config.ports.is_empty());
 }
 
 #[test]
@@ -88,6 +104,52 @@ run = "git status"
     assert_eq!(
         error.to_string(),
         "invalid command name `bad-name`: command names must match [A-Za-z_][A-Za-z0-9_]*"
+    );
+}
+
+#[test]
+fn rejects_invalid_port_numbers() {
+    let source = r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 0
+"#;
+
+    let config: CampfireConfig = toml::from_str(source).expect("config parses");
+    let error = validate_config(&config).expect_err("invalid port fails");
+
+    assert_eq!(
+        error,
+        ConfigValidationError::InvalidPort {
+            index: 0,
+            field: "container",
+            value: 0,
+        }
+    );
+}
+
+#[test]
+fn rejects_invalid_bind_addresses() {
+    let source = r#"
+[campfire]
+image = "fedora"
+
+[[ports]]
+container = 8080
+bind = "localhost"
+"#;
+
+    let config: CampfireConfig = toml::from_str(source).expect("config parses");
+    let error = validate_config(&config).expect_err("invalid bind fails");
+
+    assert_eq!(
+        error,
+        ConfigValidationError::InvalidBindAddress {
+            index: 0,
+            bind: "localhost".to_string(),
+        }
     );
 }
 

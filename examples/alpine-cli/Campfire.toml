@@ -1,0 +1,21 @@
+[campfire]
+image = "docker.io/library/alpine@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc"
+shell = "/bin/sh"
+
+[workspace]
+path = "/workspace"
+
+[env]
+set = { CAMPFIRE_EXAMPLE = "alpine-cli" }
+
+[tools.alpine]
+check = "cat /etc/alpine-release"
+contains = "3.20.10"
+
+[tools.busybox]
+check = "busybox | head -n 1"
+contains = "BusyBox v1.36.1"
+
+[tools.env]
+check = "test \"$CAMPFIRE_EXAMPLE\" = \"alpine-cli\" && echo campfire-env-ok"
+contains = "campfire-env-ok"

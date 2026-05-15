@@ -1,0 +1,1 @@
+This file lives on the host and is visible inside the campfire at /workspace/message.txt.

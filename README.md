@@ -33,6 +33,14 @@ cargo build
 
 If `cf` is already on your `PATH`, use `cf` directly instead of `./target/debug/cf`.
 
+To try a complete example with pinned CLI tool versions:
+
+```sh
+cd examples/alpine-cli
+cf check
+cf run -- sh -lc 'cat /etc/alpine-release && busybox | head -n 1'
+```
+
 Run a one-off command in the Campfire environment:
 
 ```sh

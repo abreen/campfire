@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use campfire::config::CampfireConfig;
 use campfire::host::ResolvedHostInputs;
-use campfire::podman::{build_enter_args, build_tool_check_args};
+use campfire::podman::{build_enter_args, build_run_args, build_tool_check_args};
 
 #[test]
 fn builds_interactive_enter_arguments() {
@@ -94,6 +94,50 @@ contains = "aws-cli/2.15."
             "/bin/sh",
             "-lc",
             "aws --version",
+        ]
+    );
+}
+
+#[test]
+fn builds_non_interactive_run_arguments() {
+    let config: CampfireConfig = toml::from_str(
+        r#"
+[campfire]
+image = "fedora"
+"#,
+    )
+    .expect("config parses");
+    let inputs = ResolvedHostInputs {
+        env: BTreeMap::from([("AWS_PROFILE".to_string(), "dev".to_string())]),
+        readonly_files: vec![PathBuf::from("/home/alex/.aws/config")],
+    };
+
+    let args = build_run_args(
+        &config,
+        PathBuf::from("/repo"),
+        &inputs,
+        &["sh".to_string(), "-lc".to_string(), "echo hi".to_string()],
+    );
+
+    assert_eq!(
+        args,
+        vec![
+            "run",
+            "--rm",
+            "--security-opt",
+            "label=disable",
+            "--workdir",
+            "/workspace",
+            "--volume",
+            "/repo:/workspace:rw",
+            "--volume",
+            "/home/alex/.aws/config:/home/alex/.aws/config:ro",
+            "--env",
+            "AWS_PROFILE=dev",
+            "fedora",
+            "sh",
+            "-lc",
+            "echo hi",
         ]
     );
 }

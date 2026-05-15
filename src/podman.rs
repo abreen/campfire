@@ -28,6 +28,18 @@ pub fn build_tool_check_args(
     args
 }
 
+pub fn build_run_args(
+    config: &CampfireConfig,
+    project_root: PathBuf,
+    inputs: &ResolvedHostInputs,
+    command: &[String],
+) -> Vec<String> {
+    let mut args = base_run_args(config, &project_root, inputs, false);
+    args.push(config.campfire.image.clone());
+    args.extend(command.iter().cloned());
+    args
+}
+
 fn base_run_args(
     config: &CampfireConfig,
     project_root: &Path,

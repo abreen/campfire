@@ -229,6 +229,59 @@ required_readonly = ["~/.aws/credentials"]
     )));
 }
 
+#[test]
+fn run_executes_podman_with_user_command() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        r#"
+[campfire]
+image = "fedora"
+"#,
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "ran");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .args(["run", "--", "sh", "-lc", "echo hi"])
+        .assert()
+        .success();
+
+    let calls = fs::read_to_string(log).expect("podman log");
+    assert!(calls.contains("run --rm --security-opt label=disable --workdir /workspace"));
+    assert!(calls.contains(&format!("{}:/workspace:rw", project.path().display())));
+    assert!(calls.contains("fedora sh -lc echo hi"));
+}
+
+#[test]
+fn run_propagates_podman_exit_code() {
+    let project = tempfile::tempdir().expect("project tempdir");
+    fs::write(
+        project.path().join("Campfire.toml"),
+        "[campfire]\nimage = \"fedora\"\n",
+    )
+    .expect("write config");
+    let fake_bin = tempfile::tempdir().expect("fake bin");
+    let log = project.path().join("podman.log");
+    write_fake_podman(fake_bin.path(), &log, "failed");
+
+    std::process::Command::cargo_bin("cf")
+        .expect("cf binary")
+        .current_dir(project.path())
+        .env("PATH", fake_path(fake_bin.path()))
+        .env("PODMAN_LOG", &log)
+        .env("PODMAN_EXIT_CODE", "7")
+        .args(["run", "--", "false"])
+        .assert()
+        .code(7);
+}
+
 fn write_fake_podman(dir: &Path, log: &Path, tool_output: &str) {
     fs::create_dir_all(dir).expect("fake bin dir");
     let script = format!(
@@ -239,7 +292,7 @@ if [ "$1" = "--version" ]; then
   exit 0
 fi
 echo "{tool_output}"
-exit 0
+exit "${{PODMAN_EXIT_CODE:-0}}"
 "#,
         log = log.display(),
         tool_output = tool_output

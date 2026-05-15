@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 
 use crate::config::{CampfireConfig, discover_config};
 use crate::host::{HostContext, HostInputError, ResolvedHostInputs, validate_host_inputs};
-use crate::podman::{build_enter_args, build_tool_check_args};
+use crate::podman::{build_enter_args, build_run_args, build_tool_check_args};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -32,6 +32,12 @@ enum Commands {
     Check,
     /// Open an interactive shell inside the campfire environment.
     Enter,
+    /// Run a command inside the campfire environment.
+    Run {
+        /// Command and arguments to run after `--`.
+        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+    },
 }
 
 pub fn run() -> Result<i32> {
@@ -53,11 +59,18 @@ pub fn run() -> Result<i32> {
             let session = load_session()?;
             ensure_podman()?;
             let args = build_enter_args(&session.config, session.project_root, &session.inputs);
-            let status = Command::new("podman")
-                .args(args)
-                .status()
-                .context("failed to run podman")?;
-            Ok(status.code().unwrap_or(1))
+            run_podman_status(args)
+        }
+        Commands::Run { command } => {
+            let session = load_session()?;
+            ensure_podman()?;
+            let args = build_run_args(
+                &session.config,
+                session.project_root,
+                &session.inputs,
+                &command,
+            );
+            run_podman_status(args)
         }
     }
 }
@@ -170,6 +183,14 @@ fn run_tool_checks(session: &Session) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn run_podman_status(args: Vec<String>) -> Result<i32> {
+    let status = Command::new("podman")
+        .args(args)
+        .status()
+        .context("failed to run podman")?;
+    Ok(status.code().unwrap_or(1))
 }
 
 fn format_host_input_error(error: HostInputError) -> anyhow::Error {

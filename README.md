@@ -14,6 +14,12 @@ cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
 ```
 
+Run a command inside the configured campfire environment:
+
+```sh
+cf run -- sh -lc 'echo hello > /workspace/new-file.txt'
+```
+
 Run the real Podman integration test when Podman is available:
 
 ```sh

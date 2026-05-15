@@ -1,4 +1,4 @@
-# Campfire
+# Campfire 🏕️
 
 Campfire (`cf`) is a private Rust CLI prototype for entering repo-defined toolbox shells.
 

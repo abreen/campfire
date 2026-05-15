@@ -128,7 +128,7 @@ path = "/workspace"
         .success();
 
     let calls = fs::read_to_string(log).expect("podman log");
-    assert!(calls.contains("run --rm -it --workdir /workspace"));
+    assert!(calls.contains("run --rm -it --security-opt label=disable --workdir /workspace"));
     assert!(calls.contains(&format!("{}:/workspace:rw", project.path().display())));
     assert!(calls.contains("fedora /bin/bash"));
 }

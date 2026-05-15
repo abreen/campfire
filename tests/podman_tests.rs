@@ -34,6 +34,8 @@ path = "/workspace"
             "run",
             "--rm",
             "-it",
+            "--security-opt",
+            "label=disable",
             "--workdir",
             "/workspace",
             "--volume",
@@ -80,6 +82,8 @@ contains = "aws-cli/2.15."
         vec![
             "run",
             "--rm",
+            "--security-opt",
+            "label=disable",
             "--workdir",
             "/workspace",
             "--volume",

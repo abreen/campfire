@@ -40,6 +40,8 @@ fn base_run_args(
         args.push("-it".to_string());
     }
 
+    args.extend(["--security-opt".to_string(), "label=disable".to_string()]);
+
     args.extend([
         "--workdir".to_string(),
         config.workspace.path.clone(),

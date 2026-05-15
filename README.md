@@ -13,3 +13,9 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
 ```
+
+Run the real Podman integration test when Podman is available:
+
+```sh
+CAMPFIRE_RUN_PODMAN_TESTS=1 cargo test --test podman_integration_tests -- --nocapture
+```
